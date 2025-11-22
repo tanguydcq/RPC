@@ -1,0 +1,150 @@
+\documentclass[12pt, a4paper]{article}
+
+\usepackage[english]{babel}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\usepackage{xcolor}
+\usepackage{fancyhdr}
+\usepackage{geometry}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{subcaption}
+
+\pgfplotsset{compat=1.18}
+\setlength{\headheight}{14.5pt}
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{Projet RPC}
+\lhead{Résolution de Problèmes Combinatoires}
+\cfoot{\thepage}
+
+\title{\textbf{Résolution de Problèmes Combinatoires}}
+\author{Lesech Erwann, Le Riboter Aymeric, Ducrocq Tanguy}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Données du problème}
+
+\subsection{Entrée du problème}
+
+\subsubsection*{Première ligne}
+Trois entiers $L$, $W$, $H$ représentant les dimensions (longueur $\times$ largeur $\times$ hauteur) des
+véhicules en cm.
+
+\begin{itemize}
+    \item $L$ : longueur des véhicules ($20 \le L \le 400$)
+    \item $W$ : largeur des véhicules ($20 \le W \le 210$)
+    \item $H$ : hauteur des véhicules ($20 \le H \le 220$)
+\end{itemize}
+
+\subsubsection*{Deuxième ligne}
+
+Un entier $M$ représentant le nombre d'objets à charger.
+
+$M$ : nombre d'objets ($1 \le M \le 1000$)
+
+\subsubsection*{M lignes suivantes}
+
+Quatre entiers L2 W2 H2 D2 représentant les dimensions (longueur x largeur x hateur) et l'ordre de livraison du iième objet. Les dimensions sont en cm. Les plus petites
+valeurs de livraison doivent être livrées en priorité et D2 = -1 indique qu'il n'y a pas d'ordre de
+livraison pour cet objet.
+
+Ainsi pour chaque objet $o$: 
+
+\begin{itemize}
+    \item $L2_o$ : longueur de l'objet $o$ ($10 \le L2_o \le 500$)
+    \item $W2_o$ : largeur de l'objet $o$ ($10 \le W2_o \le 500$)
+    \item $H2_o$ : hauteur de l'objet $o$ ($10 \le H2_o \le 500$)
+    \item $D2_o$ : ordre de livraison de l'objet $o$ ($-1 \le D2_o \le M$)
+\end{itemize}
+
+\subsection{Sortie du problème}
+
+\subsubsection*{Première ligne}
+
+SAT s'il existe une solution, UNSAT sinon.
+
+Par exemple si un des articles est trop grand, la sortie sera UNSAT.
+
+\subsubsection{M lignes suivantes}
+
+v x0 y0 z0 x1 y1 z1 où $v$ est l'identifiant du véhicule (de $0$ à $N$).
+Les triplets $(x_0, y_0, z_0)$ sont les coordonnées du point de l'article le plus proche de $(0,0,0)$ et $(x_1, y_1, z_1)$
+sont les coordonnées du point de l'article le plus éloigné de $(0,0,0)$. L'ordre de sortie des
+articles doit correspondre à l'ordre d'entrée.
+
+\section{Variables et domaines de définitions}
+
+Nous allons définir les variables suivantes :
+
+\begin{itemize}
+    \item $n$ : nombre de véhicules utilisés (entier entre 1 et M)
+    \item Pour chaque objet $o$, les variables suivantes :
+    \begin{itemize}
+        \item $v_o$ : véhicule auquel l'objet $o$ est assigné (entier entre 0 et $n-1$)
+        \item $x0_o$ : coordonnée x du point le plus proche de (0,0,0) de l'objet $o$ (entier entre 0 et L)
+        \item $y0_o$ : coordonnée y du point le plus proche de (0,0,0) de l'objet $o$ (entier entre 0 et W)
+        \item $z0_o$ : coordonnée z du point le plus proche de (0,0,0) de l'objet $o$ (entier entre 0 et H)
+        \item $L2_o$ : longueur de l'objet $o$ (entier entre 10 et 500)
+        \item $W2_o$ : largeur de l'objet $o$ (entier entre 10 et 500)
+        \item $H2_o$ : hauteur de l'objet $o$ (entier entre 10 et 500)
+        \item $D2_o$ : ordre de livraison de l'objet $o$ (entier entre -1 et M)
+    \end{itemize}
+\end{itemize}
+
+
+\section{Contraintes}
+
+Nous avons les contraintes suivantes :
+
+\subsection{Satisfiable — S'assurer que tous les objets ne dépassent pas les dimensions des camions}
+
+Pour chaque objet $o$, notons ses dimensions $(L2_o, W2_o, H2_o)$ et celles du camion $(L, W, H)$. 
+L'objet peut être placé dans le camion sous l'une des $6$ orientations possibles. 
+Ainsi, il doit exister une permutation $(d_{o,1}, d_{o,2}, d_{o,3})$ de $(L2_o, W2_o, H2_o)$ telle que :
+
+\[
+\begin{aligned}
+d_{o,1} &\leq L, \\
+d_{o,2} &\leq W, \\
+d_{o,3} &\leq H.
+\end{aligned}
+\]
+
+Autrement dit :
+
+\[
+\exists (d_{o,1}, d_{o,2}, d_{o,3}) \in \mathrm{Perm}(L2_o, W2_o, H2_o)
+\quad \text{tel que} \quad
+(d_{o,1} \leq L) \wedge (d_{o,2} \leq W) \wedge (d_{o,3} \leq H).
+\]
+
+
+\subsection{Aucun objet ne doit chevaucher un autre objet (condition de non-chevauchement)}
+
+Pour tout paire d'objets $(i, j)$, si les deux objets sont assignés au même véhicule, alors leurs positions doivent être telles qu'ils ne se chevauchent pas. Cela peut être formulé par les contraintes suivantes :
+
+
+\subsection{S'assurer que les objets d'un camion ne dépasse pas les dimensions du camion}
+
+Soit un véhicule $v$ utilisé, pour chaque article $i$ assigné à ce véhicule, les coordonnées $(x0_i, y0_i, z0_i)$ et $(x1_i, y1_i, z1_i)$ doivent respecter les contraintes suivantes :
+
+$0 \leq x0_i < x1_i \leq L$
+
+\subsection{Objectif à minimiser}
+
+La nature de ce projet est un problème d'optimisation sous contraintes. L'objectif est de minimiser le nombre de véhicules utilisés pour transporter tous les objets tout en respectant les contraintes précédemment définies.\\
+
+Formellement parlant :
+
+\[\min n
+\]
+
+\end{document}
