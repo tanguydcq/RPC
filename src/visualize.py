@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import fileinput
 import math
 import argparse
@@ -251,7 +252,14 @@ def open_file_default(file_path):
     elif system_platform == 'Darwin':  # For macOS
         subprocess.Popen(['open', file_path])
     else:  # For Linux or other Unix-based systems
-        subprocess.Popen(['xdg-open', file_path])
+        # Try to open with a browser to avoid ImageMagick issues
+        browsers = ['firefox', 'chromium-browser', 'google-chrome', 'xdg-open']
+        for browser in browsers:
+            try:
+                subprocess.Popen([browser, file_path])
+                break
+            except FileNotFoundError:
+                continue
 
 
 COLORS = [

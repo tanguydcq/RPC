@@ -56,10 +56,10 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     seed = args.seed
-    max_nb_items = 10
+    max_nb_items = 1
     max_delivery_time = -1
     if args.league == "bronze":
-        pass
+        max_nb_items = 10
     elif args.league == "silver":
         max_nb_items = 100
     else:  # gold
