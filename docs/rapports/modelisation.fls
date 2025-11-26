@@ -1,9 +1,9 @@
-PWD /home/r-one/Documents/epita/rpc/RPC/docs
+PWD /home/r-one/Documents/epita/rpc/RPC/docs/rapports
 INPUT /etc/texmf/web2c/texmf.cnf
 INPUT /usr/share/texmf/web2c/texmf.cnf
 INPUT /usr/share/texlive/texmf-dist/web2c/texmf.cnf
 INPUT /var/lib/texmf/web2c/pdftex/pdflatex.fmt
-INPUT /home/r-one/Documents/epita/rpc/RPC/docs/modelisation.tex
+INPUT /home/r-one/Documents/epita/rpc/RPC/docs/rapports/modelisation.tex
 OUTPUT modelisation.log
 INPUT /usr/share/texlive/texmf-dist/tex/latex/base/article.cls
 INPUT /usr/share/texlive/texmf-dist/tex/latex/base/article.cls
