@@ -53,6 +53,8 @@ if __name__ == "__main__":
                         dest="max_truck_dimensions", help="Dimensions maximales des véhicules")
     parser.add_argument("--max-item-dimensions", type=Dimension, default=MAX_ITEM_DIMENSIONS,
                         dest="max_item_dimensions", help="Dimensions maximales des objets")
+    parser.add_argument("--allow-unsat", action="store_true", default=False,
+                        help="Permet la génération d'objets plus grands que le camion (problème non satisfiable)")
 
     args = parser.parse_args()
     seed = args.seed
@@ -69,11 +71,26 @@ if __name__ == "__main__":
     (L1_min, W1_min, Z1_min) = MIN_TRUCK_DIMENSIONS
     (L1_max, W1_max, Z1_max) = args.max_truck_dimensions
     assert L1_max <= MAX_TRUCK_DIMENSIONS.x and W1_max <= MAX_TRUCK_DIMENSIONS.y and Z1_max <= MAX_TRUCK_DIMENSIONS.z
-    print(*generate_vehicle([L1_min, L1_max], [W1_min, W1_max], [Z1_min, Z1_max]))
+    
+    # Generate the truck first and get its actual dimensions
+    truck_dimensions = generate_vehicle([L1_min, L1_max], [W1_min, W1_max], [Z1_min, Z1_max])
+    print(*truck_dimensions)
 
+    # Use the actual truck dimensions to constrain item generation (if requested)
+    (truck_L, truck_W, truck_Z) = truck_dimensions
     (L2_min, W2_min, Z2_min) = MIN_ITEM_DIMENSIONS
     (L2_max, W2_max, Z2_max) = args.max_item_dimensions
-    assert L2_max <= MAX_ITEM_DIMENSIONS.x and W2_max <= MAX_ITEM_DIMENSIONS.y and Z2_max <= MAX_ITEM_DIMENSIONS.z
+    
+    if not args.allow_unsat:
+        # Items cannot be larger than the truck in any dimension
+        L2_max = min(L2_max, truck_L)
+        W2_max = min(W2_max, truck_W) 
+        Z2_max = min(Z2_max, truck_Z)
+        
+        # Ensure minimum dimensions are still valid
+        if L2_min > L2_max or W2_min > W2_max or Z2_min > Z2_max:
+            raise ValueError(f"Truck dimensions {truck_dimensions} are too small for minimum item dimensions {(L2_min, W2_min, Z2_min)}")
+    
     nb_items = prng_range(1, max_nb_items + 1)
     print(nb_items)
     for i in range(nb_items):
