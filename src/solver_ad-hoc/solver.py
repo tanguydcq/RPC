@@ -1,5 +1,5 @@
 import sys
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 """
 ======== DATA STRUCTURES ========
@@ -71,7 +71,61 @@ def generate_output(trucks: List[Truck]) -> str:
 """
 
 class AdHocSolver:
-    pass
+    """
+    Ad-hoc solver for the 3D bin packing problem.
+    1. Checks if all objects can fit individually in the truck.
+    """
+    truck_dims = None
+    objects = None
+    
+    def __init__(self, truck_dims: Optional[Tuple[int, int, int]] = None, objects: Optional[List[Object]] = None):
+        self.truck_dims = truck_dims
+        self.objects = objects        
+    
+    def satisfiability_check(self, truck_dims: Tuple[int, int, int], objects: List[Object]) -> bool:
+        """
+        Verify that all objects can individually fit within truck dimensions.
+        Returns True if all objects are featible, False otherwise.
+        """
+        truck_length, truck_width, truck_height = truck_dims
+        
+        for obj in objects:
+            # Check if object can fit in any orientation (all 6 possible rotations)
+            orientations = [
+                (obj.length, obj.width, obj.height),
+                (obj.length, obj.height, obj.width),
+                (obj.width, obj.length, obj.height),
+                (obj.width, obj.height, obj.length),
+                (obj.height, obj.length, obj.width),
+                (obj.height, obj.width, obj.length)
+            ]
+            
+            can_fit = False
+            for length, width, height in orientations:
+                if (length <= truck_length and width <= truck_width and height <= truck_height):
+                    can_fit = True
+                    break
+            
+            if not can_fit:
+                return False
+        
+        return True
+    
+    def solve(self, truck_dims: Tuple[int, int, int], objects: List[Object]) -> List[Truck]:
+        """
+        Main solving method.
+        Returns list of trucks with placed objects or empty list if UNSAT.
+        """
+        self.truck_dims = truck_dims
+        self.objects = objects
+        
+        # 1. check if all objects can individually fit
+        if not self.satisfiability_check(truck_dims, objects):
+            return []  # UNSAT - at least one object cannot fit
+        
+        # TODO: Implement actual placement logic
+        print("All objects can fit individually. Proceeding with placement...")
+        return []
 
 """
 ======== MAIN FUNCTION ========
@@ -94,15 +148,15 @@ def main():
         
         # Solve
         solver = AdHocSolver()
-        # solution_trucks = solver.solve(objects)
+        solution_trucks = solver.solve(truck_dims, objects)
         
         # Format and output result
-        """if solution_trucks:
-            result = generate_output(solution_trucks, objects)
+        if solution_trucks:
+            result = generate_output(solution_trucks)
         else:
-            result = "UNSAT
+            result = "UNSAT"
         
-        print(result)"""
+        print(result)
         
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
