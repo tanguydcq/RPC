@@ -342,38 +342,57 @@ MAX_TRUCK_DIMENSIONS = Dimension("400x210x220")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("visualize.py")
-    parser.add_argument("input", nargs="?", type=argparse.FileType("r"), default=sys.stdin,
-                        help="Le fichier d'entrée (utilise stdin par défaut)")
+    parser.add_argument("output_file", help="Le fichier de sortie (.output) - le fichier d'entrée correspondant (.input) sera détecté automatiquement")
     parser.add_argument("--truck-no", type=int, default=None, dest="truck_no", help="Le numéro du véhicule à visualiser (si spécifié, affiche ce camion sous plusieurs angles; si non spécifié, visualise tous les camions côte à côte)")
     parser.add_argument("--truck-dimensions", type=Dimension, default=None,
-                        dest="truck_dimensions", help="Dimensions du véhicule (si non spécifié, lit depuis input.sample si renseigné, sinon utilise les dimensions maximales)")
-    parser.add_argument("--input-file", type=str, default="input.sample", dest="input_file",
-                        help="Fichier d'entrée pour lire les dimensions du camion")
+                        dest="truck_dimensions", help="Dimensions du véhicule (si non spécifié, lit depuis le fichier .input correspondant)")
 
     args = parser.parse_args()
+    
+    # Détecter automatiquement le fichier d'entrée à partir du fichier de sortie
+    if args.output_file.endswith('.output'):
+        input_file_path = args.output_file.replace('.output', '.input')
+    else:
+        # Si le fichier ne se termine pas par .output, on assume qu'on veut quand même trouver le .input correspondant
+        input_file_path = args.output_file + '.input' if not args.output_file.endswith('.input') else args.output_file
+        if input_file_path.endswith('.input'):
+            # Si on a donné un .input, on cherche le .output correspondant
+            args.output_file = input_file_path.replace('.input', '.output')
+    
+    print(f"Fichier de sortie: {args.output_file}")
+    print(f"Fichier d'entrée détecté: {input_file_path}")
         
-    # Si les dimensions ne sont pas spécifiées, les lire depuis le fichier input si renseigné
+    # Si les dimensions ne sont pas spécifiées, les lire depuis le fichier input détecté
     if args.truck_dimensions is None:
         try:
-            with open(args.input_file, 'r') as f:
+            with open(input_file_path, 'r') as f:
                 first_line = f.readline().strip()
                 dimensions = first_line.split()
                 if len(dimensions) == 3:
                     args.truck_dimensions = Dimension(f"{dimensions[0]}x{dimensions[1]}x{dimensions[2]}")
-                    print(f"Dimensions du camion lues depuis {args.input_file}: {dimensions[0]}x{dimensions[1]}x{dimensions[2]}")
+                    print(f"Dimensions du camion lues depuis {input_file_path}: {dimensions[0]}x{dimensions[1]}x{dimensions[2]}")
                 else:
                     args.truck_dimensions = MAX_TRUCK_DIMENSIONS
-                    print(f"Attention: Format des dimensions invalide dans {args.input_file}, utilisation des dimensions par défaut")
+                    print(f"Attention: Format des dimensions invalide dans {input_file_path}, utilisation des dimensions par défaut")
         except FileNotFoundError:
             args.truck_dimensions = MAX_TRUCK_DIMENSIONS
-            print(f"Attention: Fichier {args.input_file} non trouvé, utilisation des dimensions par défaut")
+            print(f"Attention: Fichier {input_file_path} non trouvé, utilisation des dimensions par défaut")
         except Exception as e:
             args.truck_dimensions = MAX_TRUCK_DIMENSIONS
-            print(f"Erreur lors de la lecture de {args.input_file}: {e}, utilisation des dimensions par défaut")
+            print(f"Erreur lors de la lecture de {input_file_path}: {e}, utilisation des dimensions par défaut")
 
 
-    # Lire toutes les lignes et organiser par camion
-    all_lines = list(args.input)
+    # Lire toutes les lignes du fichier de sortie
+    try:
+        with open(args.output_file, 'r') as f:
+            all_lines = list(f)
+    except FileNotFoundError:
+        print(f"Erreur: Fichier de sortie {args.output_file} non trouvé")
+        exit(1)
+    except Exception as e:
+        print(f"Erreur lors de la lecture de {args.output_file}: {e}")
+        exit(1)
+    
     trucks_data = {}
     first = True
     
