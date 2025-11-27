@@ -136,13 +136,15 @@ def is_above(other, item):
 def is_hidden(item, others):
     return any([ is_on_left(o[0], item) for o in others ]) and any([ is_in_front_of(o[0], item) for o in others ]) and any([ is_above(o[0], item) for o in others ])
 
-def voxel(x0, y0, z0, x1, y1, z1, color, shape):
+def voxel(x0, y0, z0, x1, y1, z1, color, shape, offset_x=0, offset_y=0, projection_func=None):
     scale = 1
     sin = .5
     cos = math.sqrt(3) / 2
 
-    def isometric_projection(x, y, z):
-        return f"{200 + (x - y) * cos * scale} {240 + ((x + y - 2 * z) * sin * scale)}"
+    def default_isometric_projection(x, y, z):
+        return f"{200 + offset_x + (x - y) * cos * scale} {240 + offset_y + ((x + y - 2 * z) * sin * scale)}"
+    
+    isometric_projection = projection_func if projection_func else default_isometric_projection
 
     def M(point):
         return f"M {point}"
@@ -253,7 +255,7 @@ def open_file_default(file_path):
         subprocess.Popen(['open', file_path])
     else:  # For Linux or other Unix-based systems
         # Try to open with a browser to avoid ImageMagick issues
-        browsers = ['firefox', 'chromium-browser', 'google-chrome', 'xdg-open']
+        browsers = ['google-chrome', 'xdg-open', 'firefox', 'chromium-browser']
         for browser in browsers:
             try:
                 subprocess.Popen([browser, file_path])
@@ -290,24 +292,92 @@ COLORS = [
     rgb(225, 128, 125)
 ]
 
+def create_projection_functions():
+    """Créer différentes fonctions de projection pour la vue multi-angles"""
+    scale = 1
+    sin = .5
+    cos = math.sqrt(3) / 2
+    
+    def front_view(offset_x, offset_y):
+        def projection(x, y, z):
+            return f"{offset_x + x * scale} {offset_y/1.1 + (y - z) * scale}"
+        return projection
+    
+    def top_view(offset_x, offset_y):
+        def projection(x, y, z):
+            return f"{offset_x + x * (scale + 0.2)} {offset_y/2 + y * (scale + 0.2)}"
+        return projection
+    
+    def side_view(offset_x, offset_y):
+        def projection(x, y, z):
+            return f"{offset_x + y * scale} {offset_y + (x - z) * scale}"
+        return projection
+    
+    def isometric_standard(offset_x, offset_y):
+        def projection(x, y, z):
+            return f"{offset_x + (x - y) * cos * scale} {offset_y + ((x + y - 2 * z) * sin * scale)}"
+        return projection
+    
+    def isometric_rotated(offset_x, offset_y):
+        def projection(x, y, z):
+            return f"{offset_x + (y - x) * cos * scale} {offset_y + ((x + y - 2 * z) * sin * scale)}"
+        return projection
+    
+    def back_isometric(offset_x, offset_y):
+        def projection(x, y, z):
+            return f"{offset_x * 1.05 + (x - y) * cos * scale} {offset_y * 1.1 + ((-x - y - 2 * z) * sin * scale)}"
+        return projection
+    
+    return {
+        'front': front_view,
+        'top': top_view,
+        'side': side_view,
+        'iso_standard': isometric_standard,
+        'iso_rotated': isometric_rotated,
+        'iso_back': back_isometric
+    }
+
+
 MAX_TRUCK_DIMENSIONS = Dimension("400x210x220")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("visualize.py")
     parser.add_argument("input", nargs="?", type=argparse.FileType("r"), default=sys.stdin,
                         help="Le fichier d'entrée (utilise stdin par défaut)")
-    parser.add_argument("--truck-no", type=int, default=0, dest="truck_no", help="Le numéro du véhicule à visualiser")
-    parser.add_argument("--truck-dimensions", type=Dimension, default=MAX_TRUCK_DIMENSIONS,
-                        dest="truck_dimensions", help="Dimensions du véhicule")
+    parser.add_argument("--truck-no", type=int, default=None, dest="truck_no", help="Le numéro du véhicule à visualiser (si spécifié, affiche ce camion sous plusieurs angles; si non spécifié, visualise tous les camions côte à côte)")
+    parser.add_argument("--truck-dimensions", type=Dimension, default=None,
+                        dest="truck_dimensions", help="Dimensions du véhicule (si non spécifié, lit depuis input.sample si renseigné, sinon utilise les dimensions maximales)")
+    parser.add_argument("--input-file", type=str, default="input.sample", dest="input_file",
+                        help="Fichier d'entrée pour lire les dimensions du camion")
 
     args = parser.parse_args()
+        
+    # Si les dimensions ne sont pas spécifiées, les lire depuis le fichier input si renseigné
+    if args.truck_dimensions is None:
+        try:
+            with open(args.input_file, 'r') as f:
+                first_line = f.readline().strip()
+                dimensions = first_line.split()
+                if len(dimensions) == 3:
+                    args.truck_dimensions = Dimension(f"{dimensions[0]}x{dimensions[1]}x{dimensions[2]}")
+                    print(f"Dimensions du camion lues depuis {args.input_file}: {dimensions[0]}x{dimensions[1]}x{dimensions[2]}")
+                else:
+                    args.truck_dimensions = MAX_TRUCK_DIMENSIONS
+                    print(f"Attention: Format des dimensions invalide dans {args.input_file}, utilisation des dimensions par défaut")
+        except FileNotFoundError:
+            args.truck_dimensions = MAX_TRUCK_DIMENSIONS
+            print(f"Attention: Fichier {args.input_file} non trouvé, utilisation des dimensions par défaut")
+        except Exception as e:
+            args.truck_dimensions = MAX_TRUCK_DIMENSIONS
+            print(f"Erreur lors de la lecture de {args.input_file}: {e}, utilisation des dimensions par défaut")
 
-    svg_content = []
-    svg_content.append("""<svg xmlns="http://www.w3.org/2000/svg" width="560" height="560">""")
-    blocks = []
+
+    # Lire toutes les lignes et organiser par camion
+    all_lines = list(args.input)
+    trucks_data = {}
     first = True
-    i = 0
-    for (i, line) in enumerate(args.input):
+    
+    for line_idx, line in enumerate(all_lines):
         if first:
             first = False
             if line == "SAT\n":
@@ -318,43 +388,140 @@ if __name__ == "__main__":
                 raise ValueError("Invalid input")
         if line == "\n":
             break
-        (truck, x0, y0, z0, x1, y1, z1) = map(int, line.split(" "))
-        if truck != args.truck_no:
+        parts = line.split(" ")
+        if len(parts) < 7:
             continue
-        blocks.append((i, (x0, y0, z0, x1, y1, z1)))
-        i += 1
+        (truck, x0, y0, z0, x1, y1, z1) = map(int, parts[:7])
+        
+        if truck not in trucks_data:
+            trucks_data[truck] = []
+        trucks_data[truck].append((line_idx, (x0, y0, z0, x1, y1, z1)))
+    
+    # Déterminer quels camions afficher
+    if args.truck_no is not None:
+        # Mode camion unique
+        trucks_to_display = [args.truck_no] if args.truck_no in trucks_data else []
+        if not trucks_to_display:
+            print(f"Aucun bloc trouvé pour le camion {args.truck_no}")
+            exit(1)
+    else:
+        # Mode tous les camions
+        trucks_to_display = sorted(trucks_data.keys())
+        if not trucks_to_display:
+            print("Aucun camion trouvé dans les données")
+            exit(1)
+    
+    num_trucks = len(trucks_to_display)
     (L, W, H) = args.truck_dimensions
-    # Drawing the truck
-    svg_content.append(voxel(-2, 0, 0, 0, H + 10, W + 10, rgb(64, 64, 64), (0, 0, 0, L, H, W)))
-    svg_content.append(voxel(0, -2, 0, L + 10, 0, W + 10, rgb(32, 32, 32), (0, 0, 0, L, H, W)))
-    svg_content.append(voxel(0, 0, -2, L + 10, H + 10, 0, rgb(0, 0, 0), (0, 0, 0, L, H, W)))
-    for y in range(0, W, 10):
-        for z in range(0, H, 10):
-            pass
-            # svg_content.append(voxel(-2, y, z, 0, y + 10, z + 10, rgb(64, 64, 64), (0, 0, 0, L, H, W)))
-    for x in range(0, L, 10):
-        for z in range(0, H, 10):
-            pass
-            # svg_content.append(voxel(x, -2, z, x + 10, 0, z + 10, rgb(32, 32, 32), (0, 0, 0, L, H, W)))
-        for y in range(0, W, 10):
-            pass
-            # svg_content.append(voxel(x, y, -2, x + 10, y + 10, 0, rgb(0, 0, 0), (0, 0, 0, L, H, W)))
-    # Drawing the blocks
-    voxels = []
-    for (i, (x0, y0, z0, x1, y1, z1)) in blocks:
-        for x in range(x0, x1, 10):
-            for y in range(y0, y1, 10):
-                for z in range(z0, z1, 10):
-                    voxels.append(((x, y, z, x + 10, y + 10, z + 10),
-                                   voxel(x, y, z, x + 10, y + 10, z + 10, COLORS[i % len(COLORS)],
-                                         (x0, y0, z0, x1, y1, z1))))
-    voxels.sort(key=lambda it: (it[0][0] + it[0][1], it[0][2]))
-
-    visible_voxels = [ i for i in voxels if not is_hidden(i[0], voxels) ]
-
-    for voxel in visible_voxels:
-        (coord, shape) = voxel
-        svg_content.append(shape)
+    
+    # Vérifier si on doit utiliser la vue multi-angles
+    # Vue multi-angles activée automatiquement quand un camion spécifique est sélectionné
+    use_multi_view = args.truck_no is not None and num_trucks == 1
+    
+    if use_multi_view:
+        # Vue multi-angles : disposition en grille 2x3 avec marges améliorées
+        view_width = 400  # Largeur de chaque vue
+        view_height = 350  # Hauteur de chaque vue
+        views_per_row = 3
+        margin_x = 80  # Marge horizontale entre les vues et du bord
+        margin_y = 100  # Marge verticale entre les vues et du bord
+        spacing_x = 50  # Espacement horizontal entre les vues
+        spacing_y = 50  # Espacement vertical entre les vues
+        
+        svg_width = 2 * margin_x + views_per_row * view_width + (views_per_row - 1) * spacing_x
+        svg_height = 2 * margin_y + 2 * view_height + spacing_y
+        
+        projection_funcs = create_projection_functions()
+        views = [
+            ('Vue Isométrique', projection_funcs['iso_standard']),
+            ('Vue Avant', projection_funcs['front']),
+            ('Vue du Dessus', projection_funcs['top']),
+            ('Vue Isométrique Rotée', projection_funcs['iso_rotated']),
+            ('Vue de Côté', projection_funcs['side']),
+            ('Vue Arrière Iso', projection_funcs['iso_back'])
+        ]
+        
+        svg_content = []
+        svg_content.append(f'<svg xmlns="http://www.w3.org/2000/svg" width="{svg_width}" height="{svg_height}">')
+        
+        truck_id = trucks_to_display[0]
+        blocks = trucks_data[truck_id]
+        
+        # Ajouter les titres et dessiner chaque vue
+        for view_idx, (view_name, proj_func) in enumerate(views):
+            row = view_idx // views_per_row
+            col = view_idx % views_per_row
+            offset_x = margin_x + col * (view_width + spacing_x)
+            offset_y = margin_y + row * (view_height + spacing_y)
+            
+            # Ajouter le titre de la vue en haut
+            svg_content.append(f'<text x="{offset_x + view_width//2}" y="{offset_y - 30}" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#333">{view_name}</text>')
+            
+            # Créer la fonction de projection avec les bons offsets (décaler les images plus bas et à droite)
+            projection_with_offset = proj_func(offset_x + 180, offset_y + 180)
+            
+            # Dessiner un cadre pour délimiter chaque vue
+            svg_content.append(f'<rect x="{offset_x - 10}" y="{offset_y - 40}" width="{view_width + 20}" height="{view_height + 20}" fill="none" stroke="#ddd" stroke-width="1" rx="5"/>')
+            
+            # Dessiner la structure du camion
+            svg_content.append(voxel(-2, 0, 0, 0, H + 10, W + 10, rgb(64, 64, 64), (0, 0, 0, L, H, W), 0, 0, projection_with_offset))
+            svg_content.append(voxel(0, -2, 0, L + 10, 0, W + 10, rgb(32, 32, 32), (0, 0, 0, L, H, W), 0, 0, projection_with_offset))
+            svg_content.append(voxel(0, 0, -2, L + 10, H + 10, 0, rgb(0, 0, 0), (0, 0, 0, L, H, W), 0, 0, projection_with_offset))
+            
+            # Dessiner les blocs
+            voxels = []
+            for (i, (x0, y0, z0, x1, y1, z1)) in blocks:
+                for x in range(x0, x1, 10):
+                    for y in range(y0, y1, 10):
+                        for z in range(z0, z1, 10):
+                            voxels.append(((x, y, z, x + 10, y + 10, z + 10),
+                                           voxel(x, y, z, x + 10, y + 10, z + 10, COLORS[i % len(COLORS)],
+                                                 (x0, y0, z0, x1, y1, z1), 0, 0, projection_with_offset)))
+            
+            voxels.sort(key=lambda it: (it[0][0] + it[0][1], it[0][2]))
+            visible_voxels = [v for v in voxels if not is_hidden(v[0], voxels)]
+            
+            for voxel_item in visible_voxels:
+                (coord, shape) = voxel_item
+                svg_content.append(shape)
+    
+    else:
+        # Vue normale (camion unique ou multiples camions)
+        # Calculer la largeur SVG en fonction du nombre de camions
+        truck_width = 400  # largeur approximative d'un camion en pixels
+        spacing = 50  # espacement entre camions
+        svg_width = max(560, num_trucks * truck_width + (num_trucks - 1) * spacing + 200)
+        
+        svg_content = []
+        svg_content.append(f'<svg xmlns="http://www.w3.org/2000/svg" width="{svg_width}" height="560">')
+        
+        # Dessiner chaque camion
+        for truck_idx, truck_id in enumerate(trucks_to_display):
+            offset_x = truck_idx * (truck_width + spacing)
+            blocks = trucks_data[truck_id]
+            
+            # Drawing the truck structure
+            svg_content.append(voxel(-2, 0, 0, 0, H + 10, W + 10, rgb(64, 64, 64), (0, 0, 0, L, H, W), offset_x))
+            svg_content.append(voxel(0, -2, 0, L + 10, 0, W + 10, rgb(32, 32, 32), (0, 0, 0, L, H, W), offset_x))
+            svg_content.append(voxel(0, 0, -2, L + 10, H + 10, 0, rgb(0, 0, 0), (0, 0, 0, L, H, W), offset_x))
+            
+            # Drawing the blocks for this truck
+            voxels = []
+            for (i, (x0, y0, z0, x1, y1, z1)) in blocks:
+                for x in range(x0, x1, 10):
+                    for y in range(y0, y1, 10):
+                        for z in range(z0, z1, 10):
+                            voxels.append(((x, y, z, x + 10, y + 10, z + 10),
+                                           voxel(x, y, z, x + 10, y + 10, z + 10, COLORS[i % len(COLORS)],
+                                                 (x0, y0, z0, x1, y1, z1), offset_x)))
+            
+            voxels.sort(key=lambda it: (it[0][0] + it[0][1], it[0][2]))
+            visible_voxels = [v for v in voxels if not is_hidden(v[0], voxels)]
+            
+            for voxel_item in visible_voxels:
+                (coord, shape) = voxel_item
+                svg_content.append(shape)
+    
     svg_content.append("</svg>")
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".svg", delete=False) as f:
