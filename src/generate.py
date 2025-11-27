@@ -86,10 +86,6 @@ if __name__ == "__main__":
         L2_max = min(L2_max, truck_L)
         W2_max = min(W2_max, truck_W) 
         Z2_max = min(Z2_max, truck_Z)
-        
-        # Ensure minimum dimensions are still valid
-        if L2_min > L2_max or W2_min > W2_max or Z2_min > Z2_max:
-            raise ValueError(f"Truck dimensions {truck_dimensions} are too small for minimum item dimensions {(L2_min, W2_min, Z2_min)}")
     
     nb_items = prng_range(1, max_nb_items + 1)
     print(nb_items)
