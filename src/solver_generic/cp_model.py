@@ -186,15 +186,23 @@ class GenericORToolsSolver:
                     model.Add(y[j] + Wj <= y[i]).OnlyEnforceIf([both_in_truck, no_overlap_y2])
                     model.Add(z[i] + Hi <= z[j]).OnlyEnforceIf([both_in_truck, no_overlap_z1])
                     model.Add(z[j] + Hj <= z[i]).OnlyEnforceIf([both_in_truck, no_overlap_z2])
+                    
+                    if self.objects[i].delivery_order >= 0 and \
+                        self.objects[j].delivery_order >= 0 and \
+                        self.objects[i].delivery_order < self.objects[j].delivery_order:
+                        model.Add(z[i] <= z[j]).OnlyEnforceIf(both_in_truck)
+                        model.Add(y[i] <= y[j]).OnlyEnforceIf(both_in_truck)
+
 
         # === Optional: delivery order ===
-        for i in range(self.n):
-            for j in range(self.n):
-                if self.objects[i].delivery_order >= 0 and \
-                   self.objects[j].delivery_order >= 0 and \
-                   self.objects[i].delivery_order < self.objects[j].delivery_order:
-                    # impose z_exit_order(i) <= z_exit_order(j)
-                    model.Add(z[i] <= z[j])
+        # for i in range(self.n):
+        #     for j in range(self.n):
+        #         if self.objects[i].delivery_order >= 0 and \
+        #            self.objects[j].delivery_order >= 0 and \
+        #            self.objects[i].delivery_order < self.objects[j].delivery_order:
+        #             # impose z_exit_order(i) <= z_exit_order(j)
+        #             model.Add(z[i] <= z[j])
+                    
 
         # Objective: minimize used trucks
         used = {k: model.NewBoolVar(f"used_{k}") for k in range(max_trucks)}
