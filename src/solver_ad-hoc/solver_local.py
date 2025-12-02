@@ -255,6 +255,20 @@ class LocalSearchSolver(BaseSolver):
         super().__init__(truck_dims, objects)
         self.best_solution = None
         self.best_score = float('inf')
+        self.min_trucks_theoretical = 0
+    
+    def calculate_min_trucks(self, truck_dims: Tuple[int, int, int], objects: List[Object]) -> int:
+        """
+        Calculate the theoretical minimum number of trucks needed based on volume.
+        This is a lower bound - the actual solution may need more trucks due to geometric constraints.
+        """
+        truck_volume = truck_dims[0] * truck_dims[1] * truck_dims[2]
+        total_objects_volume = sum(self.get_object_volume(obj) for obj in objects)
+        
+        # Ceiling division: minimum trucks needed to fit all objects by volume
+        min_trucks = (total_objects_volume + truck_volume - 1) // truck_volume
+        
+        return max(1, min_trucks)  # At least 1 truck
     
     def calculate_score(self, trucks: List[Truck]) -> float:
         """
@@ -464,6 +478,7 @@ class LocalSearchSolver(BaseSolver):
     def local_search(self, initial_solution: List[Truck], max_iterations: int = 1000, temperature: float = 100.0) -> List[Truck]:
         """
         Perform local search with simulated annealing.
+        Stops early if theoretical minimum is reached.
         """
         current_solution = self.copy_solution(initial_solution)
         current_score = self.calculate_score(current_solution)
@@ -478,7 +493,20 @@ class LocalSearchSolver(BaseSolver):
             (self.compact_operation, 0.20)
         ]
         
+        iterations_without_improvement = 0
+        early_stop_threshold = max_iterations // 10  # Stop if no improvement for 10% of max iterations
+        
         for iteration in range(max_iterations):
+            # Check if we've reached the theoretical minimum
+            if len(best_solution) <= self.min_trucks_theoretical:
+                print(f"Optimal solution reached at iteration {iteration}! (Theoretical minimum: {self.min_trucks_theoretical} trucks)", file=sys.stderr)
+                break
+            
+            # Early stopping if no improvement for a while
+            if iterations_without_improvement >= early_stop_threshold:
+                print(f"Early stopping at iteration {iteration} (no improvement for {early_stop_threshold} iterations)", file=sys.stderr)
+                break
+            
             # Select operation based on weights
             rand = random.random()
             cumulative = 0.0
@@ -494,6 +522,7 @@ class LocalSearchSolver(BaseSolver):
             new_solution = selected_operation(current_solution)
             
             if new_solution is None:
+                iterations_without_improvement += 1
                 continue
             
             new_score = self.calculate_score(new_solution)
@@ -510,7 +539,12 @@ class LocalSearchSolver(BaseSolver):
                 if current_score < best_score:
                     best_solution = self.copy_solution(current_solution)
                     best_score = current_score
-                    print(f"Iteration {iteration}: New best score = {best_score:.2f}, Trucks = {len(best_solution)}", file=sys.stderr)
+                    iterations_without_improvement = 0  # Reset counter
+                    print(f"Iteration {iteration}: New best score = {best_score:.2f}, Trucks = {len(best_solution)} (min theoretical: {self.min_trucks_theoretical})", file=sys.stderr)
+                else:
+                    iterations_without_improvement += 1
+            else:
+                iterations_without_improvement += 1
         
         return best_solution
     
@@ -520,6 +554,19 @@ class LocalSearchSolver(BaseSolver):
         """
         self.truck_dims = truck_dims
         self.objects = objects
+        
+        # Calculate theoretical minimum number of trucks
+        self.min_trucks_theoretical = self.calculate_min_trucks(truck_dims, objects)
+        truck_volume = truck_dims[0] * truck_dims[1] * truck_dims[2]
+        total_objects_volume = sum(self.get_object_volume(obj) for obj in objects)
+        
+        print("="*60, file=sys.stderr)
+        print(f"Volume Analysis:", file=sys.stderr)
+        print(f"  Truck capacity: {truck_volume:,} cubic units", file=sys.stderr)
+        print(f"  Total objects volume: {total_objects_volume:,} cubic units", file=sys.stderr)
+        print(f"  Theoretical minimum trucks: {self.min_trucks_theoretical}", file=sys.stderr)
+        print(f"  Theoretical utilization: {(total_objects_volume / (self.min_trucks_theoretical * truck_volume) * 100):.2f}%", file=sys.stderr)
+        print("="*60, file=sys.stderr)
         
         # Get initial solution using base solver
         print("Generating initial solution...", file=sys.stderr)
@@ -531,13 +578,25 @@ class LocalSearchSolver(BaseSolver):
         initial_score = self.calculate_score(initial_solution)
         print(f"Initial solution: {len(initial_solution)} trucks, score = {initial_score:.2f}", file=sys.stderr)
         
+        # Check if already optimal
+        if len(initial_solution) <= self.min_trucks_theoretical:
+            print(f"Initial solution is already optimal! (matches theoretical minimum)", file=sys.stderr)
+            return initial_solution
+        
         # Perform local search optimization
-        print("Starting local search optimization...", file=sys.stderr)
+        print(f"Starting local search optimization (gap to optimal: {len(initial_solution) - self.min_trucks_theoretical} trucks)...", file=sys.stderr)
         optimized_solution = self.local_search(initial_solution, max_iterations)
         
         final_score = self.calculate_score(optimized_solution)
+        print("="*60, file=sys.stderr)
         print(f"Final solution: {len(optimized_solution)} trucks, score = {final_score:.2f}", file=sys.stderr)
         print(f"Improvement: {len(initial_solution) - len(optimized_solution)} trucks saved", file=sys.stderr)
+        
+        if len(optimized_solution) == self.min_trucks_theoretical:
+            print(f"✓ Optimal solution found! (matches theoretical minimum)", file=sys.stderr)
+        else:
+            print(f"Gap to theoretical minimum: {len(optimized_solution) - self.min_trucks_theoretical} trucks", file=sys.stderr)
+        print("="*60, file=sys.stderr)
         
         return optimized_solution
 
