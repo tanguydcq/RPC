@@ -1,6 +1,7 @@
 import sys
 import random
 import math
+import time
 from typing import List, Tuple, Optional
 
 """
@@ -171,6 +172,41 @@ class BaseSolver:
         
         return False
     
+    def check_gravity_support(self, x: int, y: int, z: int, obj_length: int, obj_width: int, truck: Truck, exclude_obj: Optional[Object] = None) -> bool:
+        """
+        Check if at least 50% of the bottom surface is supported.
+        An object is supported if it's on the ground (z=0) or resting on other objects.
+        """
+        # Calculate the area of the bottom surface
+        bottom_area = obj_length * obj_width
+        required_support_area = bottom_area * 0.5
+        
+        # Calculate supported area by checking overlap with ground and objects below
+        supported_area = 0.0
+        
+        # If on the ground (z=0), the entire bottom surface is supported by the ground
+        if z == 0:
+            supported_area = bottom_area
+        else:
+            # Check overlap with objects directly below
+            for placed_obj, px, py, pz in truck.placed_objects:
+                if exclude_obj and placed_obj.id == exclude_obj.id:
+                    continue
+                
+                # Check if this object is directly below (top surface touches bottom of new object)
+                if pz + placed_obj.height == z:
+                    # Calculate overlap area in x-y plane
+                    overlap_x_start = max(x, px)
+                    overlap_x_end = min(x + obj_length, px + placed_obj.length)
+                    overlap_y_start = max(y, py)
+                    overlap_y_end = min(y + obj_width, py + placed_obj.width)
+                    
+                    if overlap_x_end > overlap_x_start and overlap_y_end > overlap_y_start:
+                        overlap_area = (overlap_x_end - overlap_x_start) * (overlap_y_end - overlap_y_start)
+                        supported_area += overlap_area
+        
+        return supported_area >= required_support_area
+    
     def find_best_position(self, obj: Object, obj_length: int, obj_width: int, obj_height: int, truck: Truck, exclude_obj: Optional[Object] = None) -> Optional[Tuple[int, int, int]]:
         """Find the lowest, leftmost, deepest position where the object can be placed."""
         truck_length, truck_width, truck_height = truck.length, truck.width, truck.height
@@ -179,7 +215,8 @@ class BaseSolver:
             for x in range(truck_length - obj_length + 1):
                 for y in range(truck_width - obj_width + 1):
                     if not self.check_collision(obj, x, y, z, obj_length, obj_width, obj_height, truck, exclude_obj):
-                        return (x, y, z)
+                        if self.check_gravity_support(x, y, z, obj_length, obj_width, truck, exclude_obj):
+                            return (x, y, z)
         
         return None
     
@@ -595,8 +632,10 @@ def main():
         
         truck_dims, objects = parse_input(input_text)
         
+        start_time = time.time()
         solver = RandomStartLocalSearchSolver()
         solution_trucks = solver.solve(truck_dims, objects, num_starts, ls_iterations, seed_start)
+        end_time = time.time()
         
         if solution_trucks:
             result = generate_output(solution_trucks)
@@ -604,6 +643,7 @@ def main():
             result = "UNSAT"
         
         print(result)
+        print(f"Execution time: {end_time - start_time:.3f} seconds", file=sys.stderr)
         
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
