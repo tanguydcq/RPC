@@ -90,13 +90,13 @@ class GenericORToolsSolver:
         self.objects = objects
         self.n = len(objects)
 
-    def solve(self, max_trucks=5):
+    def solve(self):
         model = cp_model.CpModel()
 
         # === Variables ===
         # Truck assignment : truck[k][i] = 1 if object i in truck k
         truck = {}
-        for k in range(max_trucks):
+        for k in range(self.n):  # max n trucks
             for i in range(self.n):
                 truck[k, i] = model.NewBoolVar(f"truck_{k}_obj_{i}")
 
@@ -131,7 +131,7 @@ class GenericORToolsSolver:
 
         # Each object assigned to exactly 1 truck
         for i in range(self.n):
-            model.Add(sum(truck[k, i] for k in range(max_trucks)) == 1)
+            model.Add(sum(truck[k, i] for k in range(self.n)) == 1)
 
         # Object uses exactly 1 orientation
         for i in range(self.n):
@@ -144,63 +144,50 @@ class GenericORToolsSolver:
             model.Add(sum(orient[i, r] * lz[i, r] for r in range(6)) + z[i] <= self.H)
 
         # === Non-overlap constraints ===
-        for k in range(max_trucks):
-            for i in range(self.n):
-                for j in range(i + 1, self.n):
-                    # Constraint: if both objects are in the same truck, they cannot overlap
-                    both_in_truck = model.NewBoolVar(f"both_{i}_{j}_t{k}")
-                    model.Add(truck[k, i] + truck[k, j] == 2).OnlyEnforceIf(both_in_truck)
-                    model.Add(truck[k, i] + truck[k, j] <= 1).OnlyEnforceIf(both_in_truck.Not())
+        for i in range(self.n):
+            for j in range(i + 1, self.n):
+                # Get effective dimensions for each object based on orientation
+                Li = sum(orient[i, r] * lx[i, r] for r in range(6))
+                Wi = sum(orient[i, r] * ly[i, r] for r in range(6))
+                Hi = sum(orient[i, r] * lz[i, r] for r in range(6))
 
-                    # Get effective dimensions for each object based on orientation
-                    Li = sum(orient[i, r] * lx[i, r] for r in range(6))
-                    Wi = sum(orient[i, r] * ly[i, r] for r in range(6))
-                    Hi = sum(orient[i, r] * lz[i, r] for r in range(6))
+                Lj = sum(orient[j, r] * lx[j, r] for r in range(6))
+                Wj = sum(orient[j, r] * ly[j, r] for r in range(6))
+                Hj = sum(orient[j, r] * lz[j, r] for r in range(6))
 
-                    Lj = sum(orient[j, r] * lx[j, r] for r in range(6))
-                    Wj = sum(orient[j, r] * ly[j, r] for r in range(6))
-                    Hj = sum(orient[j, r] * lz[j, r] for r in range(6))
+                # No overlap: at least one of these must be true when both in same truck
+                no_overlap_x1 = model.NewBoolVar(f"no_overlap_x1_{i}_{j}")
+                no_overlap_x2 = model.NewBoolVar(f"no_overlap_x2_{i}_{j}")
+                no_overlap_y1 = model.NewBoolVar(f"no_overlap_y1_{i}_{j}")
+                no_overlap_y2 = model.NewBoolVar(f"no_overlap_y2_{i}_{j}")
+                no_overlap_z1 = model.NewBoolVar(f"no_overlap_z1_{i}_{j}")
+                no_overlap_z2 = model.NewBoolVar(f"no_overlap_z2_{i}_{j}")
+                
+                # At least one no-overlap condition must be true when both in same truck
+                for k in range(self.n):
+                    model.Add(no_overlap_x1 + no_overlap_x2 + no_overlap_y1 + no_overlap_y2 + no_overlap_z1 + no_overlap_z2 >= 1).OnlyEnforceIf([truck[k, i], truck[k, j]])                
+                # Enforce the actual no-overlap constraints (only when both in same truck)
+                    model.Add(x[i] + Li <= x[j]).OnlyEnforceIf([truck[k, i], truck[k, j], no_overlap_x1])
+                    model.Add(x[j] + Lj <= x[i]).OnlyEnforceIf([truck[k, i], truck[k, j], no_overlap_x2])
+                    model.Add(y[i] + Wi <= y[j]).OnlyEnforceIf([truck[k, i], truck[k, j], no_overlap_y1])
+                    model.Add(y[j] + Wj <= y[i]).OnlyEnforceIf([truck[k, i], truck[k, j], no_overlap_y2])
+                    model.Add(z[i] + Hi <= z[j]).OnlyEnforceIf([truck[k, i], truck[k, j], no_overlap_z1])
+                    model.Add(z[j] + Hj <= z[i]).OnlyEnforceIf([truck[k, i], truck[k, j], no_overlap_z2])
 
-                    # No overlap: at least one of these must be true when both in same truck:
-                    # 1. i is completely to the left of j: x[i] + Li <= x[j]
-                    # 2. j is completely to the left of i: x[j] + Lj <= x[i]
-                    # 3. i is completely in front of j: y[i] + Wi <= y[j]
-                    # 4. j is completely in front of i: y[j] + Wj <= y[i]
-                    # 5. i is completely below j: z[i] + Hi <= z[j]
-                    # 6. j is completely below i: z[j] + Hj <= z[i]
-                    
-                    no_overlap_x1 = model.NewBoolVar(f"no_overlap_x1_{i}_{j}_t{k}")
-                    no_overlap_x2 = model.NewBoolVar(f"no_overlap_x2_{i}_{j}_t{k}")
-                    no_overlap_y1 = model.NewBoolVar(f"no_overlap_y1_{i}_{j}_t{k}")
-                    no_overlap_y2 = model.NewBoolVar(f"no_overlap_y2_{i}_{j}_t{k}")
-                    no_overlap_z1 = model.NewBoolVar(f"no_overlap_z1_{i}_{j}_t{k}")
-                    no_overlap_z2 = model.NewBoolVar(f"no_overlap_z2_{i}_{j}_t{k}")
-                    
-                    # At least one no-overlap condition must be true
-                    model.Add(no_overlap_x1 + no_overlap_x2 + no_overlap_y1 + no_overlap_y2 + no_overlap_z1 + no_overlap_z2 >= 1).OnlyEnforceIf(both_in_truck)
-                    
-                    # Enforce the actual no-overlap constraints
-                    model.Add(x[i] + Li <= x[j]).OnlyEnforceIf([both_in_truck, no_overlap_x1])
-                    model.Add(x[j] + Lj <= x[i]).OnlyEnforceIf([both_in_truck, no_overlap_x2])
-                    model.Add(y[i] + Wi <= y[j]).OnlyEnforceIf([both_in_truck, no_overlap_y1])
-                    model.Add(y[j] + Wj <= y[i]).OnlyEnforceIf([both_in_truck, no_overlap_y2])
-                    model.Add(z[i] + Hi <= z[j]).OnlyEnforceIf([both_in_truck, no_overlap_z1])
-                    model.Add(z[j] + Hj <= z[i]).OnlyEnforceIf([both_in_truck, no_overlap_z2])
-
+                # Delivery order constraints (only when both in same truck)
                     if self.objects[i].delivery_order >= 0 and \
                         self.objects[j].delivery_order >= 0 and \
                         self.objects[i].delivery_order < self.objects[j].delivery_order:
-                        model.Add(z[i] <= z[j]).OnlyEnforceIf(both_in_truck)
-                        model.Add(y[i] <= y[j]).OnlyEnforceIf(both_in_truck)
+                            model.Add(z[i] <= z[j]).OnlyEnforceIf([truck[k, i], truck[k, j]])
+                            model.Add(y[i] <= y[j]).OnlyEnforceIf([truck[k, i], truck[k, j]])
                     
 
         # Objective: minimize used trucks
-        used = {k: model.NewBoolVar(f"used_{k}") for k in range(max_trucks)}
-        for k in range(max_trucks):
+        used = {k: model.NewBoolVar(f"used_{k}") for k in range(self.n)}
+        for k in range(self.n):
             for i in range(self.n):
                 model.Add(used[k] >= truck[k, i])
-        model.Minimize(sum(used[k] for k in range(max_trucks)))
-
+        model.Minimize(sum(used[k] for k in range(self.n)))
         # === Solve ===
         solver = cp_model.CpSolver()
         solver.parameters.max_time_in_seconds = 180 # to modify as needed
@@ -213,10 +200,10 @@ class GenericORToolsSolver:
             return []
 
         # === Build result: list of Truck ===
-        trucks_out = [Truck(self.L, self.W, self.H) for _ in range(max_trucks)]
+        trucks_out = [Truck(self.L, self.W, self.H) for _ in range(self.n)]
 
         for i, obj in enumerate(self.objects):
-            for k in range(max_trucks):
+            for k in range(self.n):
                 if solver.Value(truck[k, i]) == 1:
                     xi, yi, zi = solver.Value(x[i]), solver.Value(y[i]), solver.Value(z[i])
                     # Compute orientation
@@ -269,4 +256,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
