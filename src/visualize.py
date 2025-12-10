@@ -300,7 +300,7 @@ def create_projection_functions():
     
     def front_view(offset_x, offset_y):
         def projection(x, y, z):
-            return f"{offset_x + x * scale} {offset_y/1.1 + (y - z) * scale}"
+            return f"{offset_x + x * scale} {offset_y + (y/8 - z) * scale}"
         return projection
     
     def top_view(offset_x, offset_y):
