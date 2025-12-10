@@ -1,0 +1,6 @@
+solver,time,trucks,status
+naive,12.33813214302063,0.0,Success
+naive_local,15.29390025138855,0.0,Success
+random_start,,,Timeout
+random_start_local,,,Timeout
+cp_model,,,Timeout

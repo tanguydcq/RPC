@@ -1,0 +1,1 @@
+Usage: python random_start_local.py <input_file> [num_starts] [ls_iterations] [seed_start]

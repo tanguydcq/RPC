@@ -1,0 +1,1 @@
+Usage: python solver.py <input_file>
