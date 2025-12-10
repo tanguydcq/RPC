@@ -549,11 +549,11 @@ class RandomStartLocalSearchSolver(BaseSolver):
                 global_best_solution = optimized_solution
                 global_best_score = optimized_score
                 global_best_info = (name, len(initial_solution), len(optimized_solution))
-                print(f"  ★ New global best!", file=sys.stderr)
+                print(f"  New global best!", file=sys.stderr)
             
             # Early stop if optimal
             if len(optimized_solution) <= self.min_trucks_theoretical:
-                print(f"  ✓ Optimal solution found!", file=sys.stderr)
+                print(f"  Optimal solution found!", file=sys.stderr)
                 break
         
         # Print summary
@@ -566,7 +566,7 @@ class RandomStartLocalSearchSolver(BaseSolver):
             print(f"  Total improvement: {initial_trucks} → {final_trucks} trucks", file=sys.stderr)
         
         if len(global_best_solution) == self.min_trucks_theoretical:
-            print(f"  ✓ Optimal solution (matches theoretical minimum)!", file=sys.stderr)
+            print(f"  Optimal solution (matches theoretical minimum)!", file=sys.stderr)
         else:
             print(f"  Gap to theoretical minimum: {len(global_best_solution) - self.min_trucks_theoretical} trucks", file=sys.stderr)
         print("="*60, file=sys.stderr)

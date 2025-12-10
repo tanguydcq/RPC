@@ -593,7 +593,7 @@ class LocalSearchSolver(BaseSolver):
         print(f"Improvement: {len(initial_solution) - len(optimized_solution)} trucks saved", file=sys.stderr)
         
         if len(optimized_solution) == self.min_trucks_theoretical:
-            print(f"✓ Optimal solution found! (matches theoretical minimum)", file=sys.stderr)
+            print(f" Optimal solution found! (matches theoretical minimum)", file=sys.stderr)
         else:
             print(f"Gap to theoretical minimum: {len(optimized_solution) - self.min_trucks_theoretical} trucks", file=sys.stderr)
         print("="*60, file=sys.stderr)

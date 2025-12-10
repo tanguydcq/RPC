@@ -317,7 +317,7 @@ class RandomStartSolver:
             
             # If already optimal, no need to continue
             if num_trucks <= min_trucks_theoretical:
-                print(f"  ✓ Optimal solution found!", file=sys.stderr)
+                print(f"   Optimal solution found!", file=sys.stderr)
                 print("="*60, file=sys.stderr)
                 return solution
         
@@ -334,7 +334,7 @@ class RandomStartSolver:
                 best_run_info = ("Reverse greedy", None)
             
             if num_trucks <= min_trucks_theoretical:
-                print(f"  ✓ Optimal solution found!", file=sys.stderr)
+                print(f"   Optimal solution found!", file=sys.stderr)
                 print("="*60, file=sys.stderr)
                 return solution
         
@@ -354,11 +354,11 @@ class RandomStartSolver:
                     best_num_trucks = num_trucks
                     best_utilization = utilization
                     best_run_info = ("Random", seed)
-                    print(f"  ★ New best solution!", file=sys.stderr)
+                    print(f"   New best solution!", file=sys.stderr)
                 
                 # If already optimal, no need to continue
                 if num_trucks <= min_trucks_theoretical:
-                    print(f"  ✓ Optimal solution found!", file=sys.stderr)
+                    print(f"   Optimal solution found!", file=sys.stderr)
                     break
         
         # Print summary
@@ -373,7 +373,7 @@ class RandomStartSolver:
                 print(f"  Found by: {strategy}", file=sys.stderr)
         
         if best_num_trucks == min_trucks_theoretical:
-            print(f"  ✓ Optimal solution (matches theoretical minimum)!", file=sys.stderr)
+            print(f"   Optimal solution (matches theoretical minimum)!", file=sys.stderr)
         else:
             print(f"  Gap to theoretical minimum: {best_num_trucks - min_trucks_theoretical} trucks", file=sys.stderr)
         print("="*60, file=sys.stderr)
