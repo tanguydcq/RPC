@@ -310,7 +310,12 @@ def create_projection_functions():
     
     def side_view(offset_x, offset_y):
         def projection(x, y, z):
-            return f"{offset_x + y * scale} {offset_y + (x - z) * scale}"
+            return f"{offset_x + y * scale} {offset_y + (x/8 - z) * scale}"
+        return projection
+    
+    def side_view_opposite(offset_x, offset_y):
+        def projection(x, y, z):
+            return f"{offset_x *1.05- x * 1.45 * scale} {offset_y + (y/8 - z) * scale}"
         return projection
     
     def isometric_standard(offset_x, offset_y):
@@ -320,7 +325,7 @@ def create_projection_functions():
     
     def isometric_rotated(offset_x, offset_y):
         def projection(x, y, z):
-            return f"{offset_x + (y - x) * cos * scale} {offset_y + ((x + y - 2 * z) * sin * scale)}"
+            return f"{offset_x + (y - x) * 1.25 * scale} {offset_y + ((x + y - 2 * z) * sin * scale)}"
         return projection
     
     def back_isometric(offset_x, offset_y):
@@ -332,6 +337,7 @@ def create_projection_functions():
         'front': front_view,
         'top': top_view,
         'side': side_view,
+        'side_opposite': side_view_opposite,
         'iso_standard': isometric_standard,
         'iso_rotated': isometric_rotated,
         'iso_back': back_isometric
@@ -456,8 +462,8 @@ if __name__ == "__main__":
             ('Vue Avant', projection_funcs['front']),
             ('Vue du Dessus', projection_funcs['top']),
             ('Vue Isométrique Rotée', projection_funcs['iso_rotated']),
-            ('Vue de Côté', projection_funcs['side']),
-            ('Vue Arrière Iso', projection_funcs['iso_back'])
+            ('Vue de Côté Gauche', projection_funcs['side']),
+            ('Vue de Côté Droit', projection_funcs['side_opposite'])
         ]
         
         svg_content = []
