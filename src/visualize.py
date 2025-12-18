@@ -439,6 +439,9 @@ if __name__ == "__main__":
     num_trucks = len(trucks_to_display)
     (L, W, H) = args.truck_dimensions
     
+    # fast correction of axis
+    (L, H, W) = (L, W, H)
+    
     # Vérifier si on doit utiliser la vue multi-angles
     # Vue multi-angles activée automatiquement quand un camion spécifique est sélectionné
     use_multi_view = args.truck_no is not None and num_trucks == 1
